@@ -1,40 +1,45 @@
-import requests
-requests.packages.urllib3.disable_warnings()
-base_url = 'https://cdpc.fun'
+name: "Airport Checkin"
 
+on:
+  schedule:
+    - cron: "0 22 * * *"  # scheduled at 06:00 (UTC+8) everyday
+  workflow_dispatch:
 
-def checkin():
-    email = input('email: ')
-    password = input('password: ')
+env:
+  RUN_ENV: 'prod'
 
-    email = email.split('@')
-    email = email[0] + '%40' + email[1]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # if: github.ref == 'refs/heads/master'
 
-    session = requests.session()
-    
-    session.get(base_url, verify=False)
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          # ref: master
 
-    login_url = base_url + '/auth/login'
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    }
+      - name: Set up python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
 
-    post_data = 'email=' + email + '&passwd=' + password + '&code='
-    post_data = post_data.encode()
-    response = session.post(login_url, post_data, headers=headers, verify=False)
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
-        'Referer': base_url + '/user'
-    }
+      - name: Random sleep
+        if: github.event_name == 'schedule'
+        run: sleep $(shuf -i 10-300 -n 1)
 
-    response = session.post(base_url + '/user/checkin', headers=headers, verify=False)
-    print(response.text)
-
-while True:
-    try:
-        checkin()
-    except Exception:
-        continue
-    break
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run sign
+        env:
+          SCKEY: ${{ secrets.SCKEY }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          BASE_URL: ${{ secrets.BASE_URL }}
+          TGBOT: ${{ secrets.TGBOT }}
+          TGUSERID: ${{ secrets.TGUSERID }}
+        run: |
+          python3 ./main.py
